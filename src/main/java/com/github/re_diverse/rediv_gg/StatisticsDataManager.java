@@ -41,7 +41,7 @@ public class StatisticsDataManager {
 		}
 	}
 
-	public List<StatisticsData> reDiverseGG(String sqlFunc, @Nullable Timestamp from, @Nullable Timestamp to, @Nullable String statKey) {
+	public static List<StatisticsData> reDiverseGG(String sqlFunc, int statId, @Nullable Timestamp from, @Nullable Timestamp to, @Nullable String statKey) {
 		try {
 			Connection con = ReDiv_GG.dataSource.getConnection();
 			try {
@@ -62,28 +62,31 @@ public class StatisticsDataManager {
 							 "     , stat_key            " +
 							 "     , " + sqlFunc + "(count) AS count " +
 							 "FROM   StatisticsData      " +
-							 "WHERE  time >= ?           " +
+							 "WHERE  stat_id = ?         " +
+							 "AND    time >= ?           " +
 							 "AND    time <= ?           ";
 				if(statKey != null) {
-					sql += "AND stat_key = ?";
+					sql += "AND stat_key = ? ";
 				}
-				sql += "GROUP BY stat_id, stat_key";
+				sql += "GROUP BY stat_id, stat_key ";
+				sql += "ORDER BY count DESC ";
 				PreparedStatement stmtStat = con.prepareStatement(sql);
-				stmtStat.setTimestamp(1, from);
-				stmtStat.setTimestamp(2, to);
+				stmtStat.setInt(1, statId);
+				stmtStat.setTimestamp(2, from);
+				stmtStat.setTimestamp(3, to);
 				if(statKey != null) {
-					stmtStat.setString(3, statKey);
+					stmtStat.setString(4, statKey);
 				}
 				ResultSet result = stmtStat.executeQuery();
-				int statId = 0;
+				int statIdResult = 0;
 				String statKeyResult = null;
 				long count = 0L;
 				List<StatisticsData> dataList = new ArrayList<>();
 				while (result.next()) {
-					statId = result.getInt("stat_id");
+					statIdResult = result.getInt("stat_id");
 					statKeyResult = result.getString("stat_key");
 					count = result.getLong("count");
-					dataList.add(new StatisticsData(statId, statKeyResult, count));
+					dataList.add(new StatisticsData(statIdResult, statKeyResult, count));
 				}
 				result.close();
 				stmtStat.close();
@@ -104,11 +107,9 @@ public class StatisticsDataManager {
 		}
 	}
 
-	public void appendLog(StatisticsData data) {
-		ReDiv_GG.instance.getLogger().info("saving StatisticsData");
+	public static void appendLog(StatisticsData data) {
 		try(Connection con = ReDiv_GG.dataSource.getConnection()) {
 			try {
-				con.setAutoCommit(true);
 				StringBuilder sql = new StringBuilder();
 				sql.append(" INSERT INTO StatisticsData ( ");
 				sql.append("         stat_id  ");
